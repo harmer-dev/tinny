@@ -1,0 +1,50 @@
+[package]
+name = "tinny"
+version = "0.0.0"
+description = "A toolkit to manage bare-metal (tin) computers."
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/harmer-dev/tinny"
+documentation = "https://docs.rs/tinny"
+homepage = "https://harmer-dev.github.io/tinny/"
+readme = "README.md"
+# keywords = []
+# categories = []
+exclude = [".github/"]
+
+[[bin]]
+name = "can"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.*", features = ["derive", "cargo", "wrap_help"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+jsonptr = "*"
+anyhow = "*"
+zeroize = "*"
+secrecy = "*"
+inquire = "*"
+aws-lc-rs = { version = "*", features = ["prebuilt-nasm"] }
+argon2 = "*"
+password-hash = "0.5.0"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+assert_fs = "1"
+
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
+[workspace.metadata.dist]
+cargo-dist-version = "0.31.0"
+ci = ["github"]
+installers = []
+targets = [
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+]

@@ -12,10 +12,6 @@ readme = "README.md"
 # categories = []
 exclude = [".github/"]
 
-[[bin]]
-name = "can"
-path = "src/main.rs"
-
 [dependencies]
 clap = { version = "4.*", features = ["derive", "cargo", "wrap_help"] }
 serde = { version = "1.0", features = ["derive"] }

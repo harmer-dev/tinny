@@ -8,14 +8,24 @@ use serde::{Deserialize, Serialize};
 use crate::types::SecretBytes;
 use crate::utils::make_salt;
 
+/// Handles key derivation, encryption/decryption (sealing/unsealing), and key lifecycle.
+///
+/// `CanOpener` uses Argon2id for KDF (Key Derivation Function) and AES-256-GCM-SIV
+/// for authenticated symmetric encryption.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CanOpener {
+    /// The Argon2id KDF parameter and salt metadata encoded in PHC format.
     pub meta: String,
+    /// The derived symmetric key, wrapped in a secure container.
+    /// It is cleared/zeroized when `CanOpener` is locked or dropped.
     #[serde(skip)]
     pub key: Option<SecretBytes>,
 }
 
 impl CanOpener {
+    /// Creates a new `CanOpener` with a fresh, randomly generated KDF salt.
+    ///
+    /// The default Argon2id parameters (m_cost, t_cost, p_cost) are utilized.
     pub fn new() -> Result<Self> {
         let salt = make_salt()?;
         let phc = format!(
@@ -31,6 +41,12 @@ impl CanOpener {
         })
     }
 
+    /// Derives the encryption key from the given passphrase and stored metadata salt.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - The metadata PHC format is invalid or unsupported.
+    /// - Key derivation fails.
     pub fn unlock(&mut self, passphrase: &SecretBytes) -> Result<()> {
         let parsed = PasswordHash::new(&self.meta)
             .map_err(|e| anyhow!("invalid key metadata PHC string: {e}"))?;
@@ -79,10 +95,17 @@ impl CanOpener {
         Ok(())
     }
 
+    /// Locks the opener by discarding and zeroizing the derived symmetric key.
     pub fn lock(&mut self) {
         self.key = None;
     }
 
+    /// Encrypts (seals) a secret using AES-256-GCM-SIV with the derived key.
+    ///
+    /// Generates a randomized nonce, encrypts the plaintext in-place, and appends the auth tag.
+    ///
+    /// # Errors
+    /// Returns an error if the `CanOpener` is currently locked or if encryption fails.
     pub fn seal(&self, secret: &mut SecretBytes) -> Result<Vec<u8>> {
         let key_material = self
             .key
@@ -104,6 +127,15 @@ impl CanOpener {
         Ok(ciphertext)
     }
 
+    /// Decrypts (unseals) a ciphertext using AES-256-GCM-SIV with the derived key.
+    ///
+    /// Reconstitutes the nonce and authentication tag, performs decryption, and validates integrity.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - The `CanOpener` is currently locked.
+    /// - The ciphertext length is too short to be valid.
+    /// - Decryption or integrity verification fails (e.g. wrong passphrase or tampered data).
     pub fn unseal(&self, ciphertext: &[u8]) -> Result<SecretBytes> {
         let key_material = self
             .key

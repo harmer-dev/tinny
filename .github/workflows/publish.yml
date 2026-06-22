@@ -1,0 +1,98 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'The Run ID of the Build and Publish workflow run to publish from'
+        required: true
+        type: string
+
+permissions:
+  contents: write # Required to create/edit GitHub releases
+
+jobs:
+  publish:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Commit SHA from Target Workflow Run
+        id: get-commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMIT_SHA=$(gh api repos/${{ github.repository }}/actions/runs/${{ inputs.run_id }} --jq '.head_sha')
+          if [ -z "$COMMIT_SHA" ]; then
+            echo "Error: Could not retrieve commit SHA for run ID ${{ inputs.run_id }}"
+            exit 1
+          fi
+          echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "Resolved target commit SHA: $COMMIT_SHA"
+
+      - name: Checkout Code at Commit SHA
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.get-commit.outputs.sha }}
+          fetch-depth: 0 # Get tags/history for changelog generation and validation
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify Version Bump is Valid
+        run: cargo xtask validate
+
+      - name: Build crates.io Package (cargo package)
+        run: cargo package --all-features
+
+      - name: Download Pre-built Release Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./downloaded-artifacts
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p ./release-assets
+          find ./downloaded-artifacts -name "*.tar.gz" -exec cp {} ./release-assets/ \;
+          echo "Release assets prepared:"
+          ls -la ./release-assets/
+
+      - name: Generate Release Notes
+        run: cargo xtask changelog > RELEASE_NOTES.md
+
+      - name: Determine Package Version
+        id: get-version
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Package version resolved: $VERSION"
+
+      - name: Create Draft GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.get-version.outputs.version }}" \
+            --draft \
+            --title "v${{ steps.get-version.outputs.version }}" \
+            --notes-file RELEASE_NOTES.md \
+            ./release-assets/*.tar.gz
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "Error: CRATES_IO_TOKEN secret is not set."
+            exit 1
+          fi
+          cargo publish --all-features
+
+      - name: Publish (Undraft) GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "v${{ steps.get-version.outputs.version }}" --draft=false

@@ -1,3 +1,5 @@
+//! The `can` command-line utility for managing bare-metal/local secret stores securely.
+
 use std::io::IsTerminal;
 use std::io::{self, Write};
 

@@ -1,0 +1,11 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+git-cliff-core = "2.13.1"
+git2 = "0.20"
+chrono = "0.4"
+clap = { version = "4", features = ["derive"] }

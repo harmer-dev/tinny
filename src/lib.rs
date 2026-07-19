@@ -394,6 +394,8 @@ fn prompt_secret(message: &str, help: &str, confirm: Option<(&str, &str)>) -> Re
         builder = builder
             .with_custom_confirmation_message(confirm_msg)
             .with_custom_confirmation_error_message(confirm_err);
+    } else {
+        builder = builder.without_confirmation();
     }
 
     Ok(SecretString::from(builder.prompt()?))

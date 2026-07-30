@@ -8,6 +8,16 @@ on:
       - 'v*'
 
 jobs:
+  publish-check:
+    name: Check crates.io Publish Validity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Dry-run publish
+        run: cargo publish --dry-run --all-features
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -114,3 +124,16 @@ jobs:
           name: tinny-${{ matrix.target }}
           path: ${{ env.ASSET_PATH }}
           retention-days: 7
+
+  validate-version:
+    name: Validate Version Bump
+    runs-on: ubuntu-latest
+    needs: [release, publish-check]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Required to get git history/tags for validation
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Validate version against conventional commits
+        run: cargo xtask validate

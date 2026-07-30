@@ -12,6 +12,10 @@ readme = "README.md"
 # categories = []
 exclude = [".github/"]
 
+[features]
+default = []
+version-from-git = ["dep:git-cliff-core", "dep:git2", "dep:chrono"]
+
 [dependencies]
 clap = { version = "4.*", features = ["derive", "cargo", "wrap_help"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -30,6 +34,11 @@ assert_cmd = "2"
 predicates = "3"
 assert_fs = "1"
 
+[build-dependencies]
+git-cliff-core = { version = "2.13.1", optional = true }
+git2 = { version = "0.20", optional = true }
+chrono = { version = "0.4", optional = true }
+
 [profile.dist]
 inherits = "release"
 lto = "thin"
@@ -43,4 +52,10 @@ targets = [
     "aarch64-unknown-linux-gnu",
     "x86_64-unknown-linux-gnu",
     "x86_64-unknown-linux-musl",
+]
+
+[workspace]
+members = [
+    ".",
+    "xtask",
 ]
